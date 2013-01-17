@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block main %}
+
+<div class="container-fluid">
+    <div class="row-fluid">
+        <form method="post">
+            {% csrf_token %}
+            {{form}}
+            <p>
+                <input type="submit" class="btn" value="Add Tag" />
+            </p>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block js %} 
+
+<script>
+    $('#name').focus()
+</script>
+
+{% endblock %}
