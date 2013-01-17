@@ -141,6 +141,6 @@ LOGGING = {
 LOGIN_URL = '/login'
 
 try:
-    from mysettings import *
+    from local_settings import *
 except:
     pass
