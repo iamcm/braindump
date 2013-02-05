@@ -1,6 +1,6 @@
 # Create your views here.
 from django.shortcuts import redirect, render_to_response, HttpResponseRedirect, HttpResponse
-from core.models import Item, Tag, FailedLogin, BannedIP, CoreUser
+from core.models import Item, Tag, FailedLogin, BannedIP, User
 from core.forms import ItemForm, TagForm, LoginForm
 from django.template import RequestContext
 from django.db.models import Q
@@ -77,8 +77,8 @@ def login(request):
 
 def api_login_required(fn):
  	def wrap(request, *args, **kwargs):
- 		key = request.GET.get('api_key')
- 		user = CoreUser.objects.filter(api_key=key)
+ 		key = request.GET.get('key')
+ 		user = User.objects.filter(api_key=key)
  		if user:
  			request.user = user[0]
  			return fn(request, *args, **kwargs)
@@ -217,7 +217,7 @@ def api_key(request):
 @login_required()
 def api_key_generate(request):
 	key = generate_api_key()
-	while CoreUser.objects.filter(api_key=key).exists():
+	while User.objects.filter(api_key=key).exists():
 		key = generate_api_key()
 
 	request.user.api_key = key
@@ -243,7 +243,8 @@ import json
 
 def JSONResponse(data, callback):
 	callback = callback or 'jsonp'
-	data = '%s({"data":%s})' % (callback, json.dumps(data))
+	data = json.dumps(data)
+	#data = '%s({"data":%s})' % (callback, json.dumps(data))
 	response = HttpResponse(data, content_type="application/json", )
 	response['Access-Control-Allow-Origin'] = '*'
 	response['Access-Control-Allow-Headers'] = 'X-Requested-With'

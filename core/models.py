@@ -30,6 +30,6 @@ class FailedLogin(models.Model):
 
 
 ##################
-class CoreUser(AbstractUser):
+class User(AbstractUser):
 	api_key = models.CharField(max_length=100)
 ##################

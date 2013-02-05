@@ -139,6 +139,7 @@ LOGGING = {
 
 
 LOGIN_URL = '/login'
+AUTH_USER_MODEL = 'core.User'
 
 try:
     from local_settings import *
