@@ -11,6 +11,11 @@ class Tag(models.Model):
 	def __str__(self):
 		return self.name
 
+	def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
+		self.slug = self.name.lower().replace(' ','-')
+		super(Tag, self).save(force_insert, force_update, using, update_fields)
+
 
 class Item(models.Model):
 	title = models.CharField(max_length=200)

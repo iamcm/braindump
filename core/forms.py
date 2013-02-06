@@ -12,6 +12,7 @@ class ItemForm(forms.ModelForm):
 class TagForm(forms.ModelForm):
 	class Meta:
 		model = Tag
+		fields = ['name']
 
 class LoginForm(forms.Form):
 	username = forms.CharField()
