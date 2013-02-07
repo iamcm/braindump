@@ -273,7 +273,7 @@ def api_filter_tag(request, slug):
 @api_login_required
 def api_filter_search(request, searchterm):
 	_items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm)).order_by('-added').values('id', 'title', 'content')
-	items = [{'title':str(i['title']), 'content':str(i['content'])} for i in _items]
+	items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in _items]
 
 	return JSONResponse(items, request.GET.get('callback'))
 
