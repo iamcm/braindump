@@ -26,6 +26,7 @@ urlpatterns = patterns('',
     url(r'^api/tags$', 'core.views.api_tags', name='api_tags'),
     url(r'^api/filter/tag/([a-zA-Z-0-9]+)$', 'core.views.api_filter_tag', name='api_filter_tag'),
     url(r'^api/filter/search/([a-zA-Z-0-9 ]+)$', 'core.views.api_filter_search', name='api_filter_search'),
+    url(r'^api/save/item$', 'core.views.api_save_item', name='api_save_item'),
 
 
 

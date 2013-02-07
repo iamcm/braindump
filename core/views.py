@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from django.contrib import auth
 from django.core.mail import mail_admins
+from django.views.decorators.csrf import csrf_exempt
 
 from urlparse import urlparse
 from datetime import datetime, timedelta
@@ -69,9 +70,9 @@ def login(request):
 				mail_admins('Failed login attempt', str(request.POST))
 				return HttpResponseRedirect('/login')
 
-
 	else:
 		f = LoginForm()
+
 	return render_to_response('core/login.html', {'form':f.as_p()}, context_instance=RequestContext(request))
 
 
@@ -254,7 +255,7 @@ def JSONResponse(data, callback):
 
 @api_login_required
 def api_tags(request):
-	tags = [{'name':str(t['name']), 'slug':str(t['slug'])} for t in Tag.objects.values().order_by('name')]
+	tags = [{'id':str(t['id']), 'name':str(t['name']), 'slug':str(t['slug'])} for t in Tag.objects.values().order_by('name')]
 
 	return JSONResponse(tags, request.GET.get('callback'))
 
@@ -262,21 +263,32 @@ def api_tags(request):
 @api_login_required
 def api_filter_tag(request, slug):
 	if slug.lower() == 'all':
-		items = [{'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.order_by('-added').values('title', 'content')]
+		items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.order_by('-added').values('id', 'title', 'content')]
 	else:
-		items = [{'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.filter(tags__slug=slug).order_by('-added').values('title', 'content')]
+		items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.filter(tags__slug=slug).order_by('-added').values('id', 'title', 'content')]
 	
 	return JSONResponse(items, request.GET.get('callback'))
 	
 
 @api_login_required
 def api_filter_search(request, searchterm):
-	_items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm)).order_by('-added').values('title', 'content')
+	_items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm)).order_by('-added').values('id', 'title', 'content')
 	items = [{'title':str(i['title']), 'content':str(i['content'])} for i in _items]
 
 	return JSONResponse(items, request.GET.get('callback'))
 
 
+@csrf_exempt
+def api_save_item(request):
+	if request.POST:
+		f = ItemForm(request.POST)
+		if f.is_valid():
+			f.save()
+
+	return JSONResponse([], request.GET.get('callback'))
+
+
+@csrf_exempt
 def api_login(request):
 	username = request.POST.get('username')
 	password = request.POST.get('password')
