@@ -1,4 +1,3 @@
-# Create your views here.
 from django.shortcuts import redirect, render_to_response, HttpResponseRedirect, HttpResponse
 from core.models import Item, Tag, FailedLogin, BannedIP, User
 from core.forms import ItemForm, TagForm, LoginForm
@@ -102,25 +101,25 @@ def logout(request):
 ############################
 @login_required()
 def home(request):
-	tags = Tag.objects.order_by('name')
+	tags = Tag.objects.all()
 	return render_to_response('core/index.html', {'tags':tags})
 
 
 @login_required()
 def filter_tag(request, slug):
 	if slug.lower() == 'all':
-		items = Item.objects.order_by('-added')
+		items = Item.objects.all()
 	else:
-		items = Item.objects.filter(tags__slug=slug).order_by('-added')
+		items = Item.objects.filter(tags__slug=slug)
 
-	tags = Tag.objects.order_by('name')
+	tags = Tag.objects.all()
 
 	return render_to_response('core/index.html', {'items':items, 'tags':tags})
 
 
 @login_required()
 def filter_search(request, searchterm):
-	items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm)).order_by('-added')
+	items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm))
 	return render_to_response('core/items.html', {'items':items})
 
 
@@ -170,7 +169,7 @@ def item_delete(request, id):
 
 @login_required()
 def tags(request):
-	tags = Tag.objects.order_by('name')
+	tags = Tag.objects.all()
 	return render_to_response('core/tags.html', {'tags':tags})
 
 
@@ -255,7 +254,7 @@ def JSONResponse(data, callback):
 
 @api_login_required
 def api_tags(request):
-	tags = [{'id':str(t['id']), 'name':str(t['name']), 'slug':str(t['slug'])} for t in Tag.objects.values().order_by('name')]
+	tags = [{'id':str(t['id']), 'name':str(t['name']), 'slug':str(t['slug'])} for t in Tag.objects.values()]
 
 	return JSONResponse(tags, request.GET.get('callback'))
 
@@ -263,16 +262,16 @@ def api_tags(request):
 @api_login_required
 def api_filter_tag(request, slug):
 	if slug.lower() == 'all':
-		items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.order_by('-added').values('id', 'title', 'content')]
+		items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.values('id', 'title', 'content')]
 	else:
-		items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.filter(tags__slug=slug).order_by('-added').values('id', 'title', 'content')]
+		items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.filter(tags__slug=slug).values('id', 'title', 'content')]
 	
 	return JSONResponse(items, request.GET.get('callback'))
 	
 
 @api_login_required
 def api_filter_search(request, searchterm):
-	_items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm)).order_by('-added').values('id', 'title', 'content')
+	_items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm)).values('id', 'title', 'content')
 	items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in _items]
 
 	return JSONResponse(items, request.GET.get('callback'))

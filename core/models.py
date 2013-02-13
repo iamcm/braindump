@@ -16,6 +16,9 @@ class Tag(models.Model):
 		self.slug = self.name.lower().replace(' ','-')
 		super(Tag, self).save(force_insert, force_update, using, update_fields)
 
+	class Meta:
+		ordering = ['name']
+
 
 class Item(models.Model):
 	title = models.CharField(max_length=200)
@@ -23,6 +26,8 @@ class Item(models.Model):
 	tags = models.ManyToManyField(Tag)
 	added = models.DateField(auto_now=True)
 
+	class Meta:
+		ordering = ['-added']
 
 class BannedIP(models.Model):
 	ip = models.IPAddressField(max_length=20)
