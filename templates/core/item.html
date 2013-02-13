@@ -8,6 +8,9 @@
             {% csrf_token %}
             {{form}}
             <p>
+                New Tag: <input type="text" name="newTag" value="{{newTags}}" />
+            </p>
+            <p>
                 <input type="submit" class="btn" value="Add Item" />
             </p>
         </form>

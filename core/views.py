@@ -32,7 +32,7 @@ def get_safe_url(url, safehost):
 		return url
 
 def login(request):
-	if request.POST:
+	if request.method == 'POST':
 		ip = request.META['REMOTE_ADDR']
 		# check for banned ip
 		banned = BannedIP.objects.values_list('ip')
@@ -128,23 +128,41 @@ def filter_search(request, searchterm):
 
 @login_required()
 def item(request):
-	if request.POST:
-		f = ItemForm(request.POST)
+	if request.method == 'POST':
+
+		postdata = request.POST.copy()
+		t = None
+		
+		if request.POST.get('newTag'):
+			t = Tag()
+			t.name = request.POST.get('newTag') 
+			t.save()	
+
+			if 'tags' in postdata:
+				postdata.appendlist('tags', str(t.id))
+			else:
+				postdata['tags'] = str(t.id)
+
+		f = ItemForm(postdata)
 		if f.is_valid():
 			f.save()
+
 			return HttpResponseRedirect('/')
+		else:
+			if t:
+				t.delete()
 
 	else:
 		f = ItemForm()
 
-	return render_to_response('core/item.html', {'form':f.as_p() }, context_instance=RequestContext(request))
+	return render_to_response('core/item.html', {'form':f.as_p(), 'newTags':request.POST.get('newTag') or '' }, context_instance=RequestContext(request))
 
 
 @login_required()
 def item_edit(request, id):
 	i = Item.objects.get(pk=id)
 
-	if request.POST:
+	if request.method == 'POST':
 		f = ItemForm(request.POST, instance=i)		
 		if f.is_valid():
 			f.save()
@@ -175,7 +193,7 @@ def tags(request):
 
 @login_required()
 def tag(request):
-	if request.POST:
+	if request.method == 'POST':
 		f = TagForm(request.POST)
 		if f.is_valid():
 			f.save()
@@ -190,7 +208,7 @@ def tag(request):
 def tag_edit(request, id):
 	i = Tag.objects.get(pk=id)
 
-	if request.POST:
+	if request.method == 'POST':
 		f = TagForm(request.POST, instance=i)
 		if f.is_valid():
 			f.save()
@@ -279,7 +297,7 @@ def api_filter_search(request, searchterm):
 
 @csrf_exempt
 def api_save_item(request):
-	if request.POST:
+	if request.method == 'POST':
 		f = ItemForm(request.POST)
 		if f.is_valid():
 			f.save()
