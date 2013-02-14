@@ -47,27 +47,9 @@ def login(request):
 			b.save()
 			return HttpResponseRedirect('/login')
 
-		postdata = request.POST
-		f = LoginForm(postdata)
-		if f.is_valid():
-			u = auth.authenticate(username=postdata['username'], password=postdata['password'])
-			if u:
-				if u.is_active:
-					auth.login(request, u)
-
-					if request.GET.get('next'):
-						redirect_to = get_safe_url(request.GET['next'], request.get_host())
-					else:
-						redirect_to = '/'
-
-					return HttpResponseRedirect(redirect_to)
-			else:
-				f= FailedLogin()
-				f.ip = ip
-				f.save()
-
-				mail_admins('Failed login attempt', str(request.POST))
-				return HttpResponseRedirect('/login')
+		success_redirect = get_safe_url(request.GET['next'], request.get_host()) if request.GET.get('next') else '/'
+		
+		return process_login(request, success_redirect, '/login')
 
 	else:
 		f = LoginForm()
@@ -75,17 +57,43 @@ def login(request):
 	return render_to_response('core/login.html', {'form':f.as_p()}, context_instance=RequestContext(request))
 
 
-def api_login_required(fn):
- 	def wrap(request, *args, **kwargs):
- 		key = request.GET.get('key')
- 		user = User.objects.filter(api_key=key)
- 		if user:
- 			request.user = user[0]
- 			return fn(request, *args, **kwargs)
- 		else:
- 			return HttpResponse(status=403)
- 		 			
-	return wrap
+def process_login(request, success_redirect=None, error_redirect=None, success_response=None):
+	f = LoginForm(request.POST)
+	
+	if f.is_valid():
+		u = auth.authenticate(username=request.POST['username'], password=request.POST['password'])
+		if u:
+			if u.is_active:
+				auth.login(request, u)
+
+				if success_redirect:
+					return HttpResponseRedirect(success_redirect)
+				elif success_response:
+					return success_response
+				else:
+					return HttpResponse(200)
+
+			else:
+				mail_admins('Inactive user attempted to login', '')
+
+				if error_redirect:
+					return HttpResponseRedirect(error_redirect)
+				else:
+					return HttpResponse(status=403)
+
+		else:
+			f = FailedLogin()
+			f.ip = request.META['REMOTE_ADDR']
+			f.save()
+
+			mail_admins('Failed login attempt', '')
+			if error_redirect:
+				return HttpResponseRedirect(error_redirect)
+			else:
+				return HttpResponse(status=403)
+
+	else:
+		return False
 
 
 
@@ -270,14 +278,14 @@ def JSONResponse(data, callback):
 	return response
 
 
-@api_login_required
+@login_required(login_url='/mobile/index.html#login')
 def api_tags(request):
 	tags = [{'id':str(t['id']), 'name':str(t['name']), 'slug':str(t['slug'])} for t in Tag.objects.values()]
 
 	return JSONResponse(tags, request.GET.get('callback'))
 
 
-@api_login_required
+@login_required(login_url='/mobile/index.html#login')
 def api_filter_tag(request, slug):
 	if slug.lower() == 'all':
 		items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in Item.objects.values('id', 'title', 'content')]
@@ -287,7 +295,7 @@ def api_filter_tag(request, slug):
 	return JSONResponse(items, request.GET.get('callback'))
 	
 
-@api_login_required
+@login_required(login_url='/mobile/index.html#login')
 def api_filter_search(request, searchterm):
 	_items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm)).values('id', 'title', 'content')
 	items = [{'id':str(i['id']), 'title':str(i['title']), 'content':str(i['content'])} for i in _items]
@@ -296,6 +304,7 @@ def api_filter_search(request, searchterm):
 
 
 @csrf_exempt
+@login_required(login_url='/mobile/index.html#login')
 def api_save_item(request):
 	if request.method == 'POST':
 		f = ItemForm(request.POST)
@@ -311,17 +320,8 @@ def api_login(request):
 	password = request.POST.get('password')
 
 	if username and password:
-		u = auth.authenticate(username=username, password=password)
-		if u:
-			if u.is_active:
-				return JSONResponse({'key':u.api_key}, request.GET.get('callback'))
-			else:
-				mail_admins('Inactive user trying to log in', str(request.POST))
-				return HttpResponse(status=403)
-		else:
-			mail_admins('Failed login attempt', str(request.POST))
-			return HttpResponse(status=403)
+		return process_login(request, success_response=JSONResponse([], request.GET.get('callback')))
 
 	else:
-		mail_admins('Failed login attempt, username and password not present', str(request.POST))
+		mail_admins('Failed login attempt, username and password not present', '')
 		return HttpResponse(status=403)
