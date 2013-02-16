@@ -2,10 +2,14 @@ import os
 import pyodbc
 from elementtree import TidyTools, ElementTree as ET
 
-server = '127.0.0.1'
-database = 'braindump'
-uid = 'postgres'
-password = 'password'
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__),'..', 'braindump'))
+from settings import DATABASES
+
+server =  '127.0.0.1'
+database = DATABASES['default']['NAME']
+uid = DATABASES['default']['USER']
+password = DATABASES['default']['PASSWORD']
 
 cnxn = pyodbc.connect('DRIVER={PostgreSQL uniCODE};SERVER=%s;PORT=5432;DATABASE=%s;UID=%s;PWD=%s' % (server, database, uid, password))
 cursor = cnxn.cursor()
