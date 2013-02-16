@@ -1,5 +1,5 @@
 from django.shortcuts import redirect, render_to_response, HttpResponseRedirect, HttpResponse
-from core.models import Item, Tag, FailedLogin, BannedIP, User
+from core.models import Item, Tag, FailedLogin, BannedIP, User, SearchCache
 from core.forms import ItemForm, TagForm, LoginForm
 from django.template import RequestContext
 from django.db.models import Q
@@ -14,6 +14,15 @@ import string
 from random import sample
 ############################
 ############################
+
+from braindump import settings
+
+if settings.SPHINX_PATH:
+	import sys
+	sys.path.append(settings.SPHINX_PATH)
+
+	import sphinxapi
+	sphinxclient = sphinxapi.SphinxClient()
 
 def generate_api_key():
 	key = ''
@@ -125,10 +134,25 @@ def filter_tag(request, slug):
 	return render_to_response('core/index.html', {'items':items, 'tags':tags})
 
 
+#@login_required()
+#def filter_search(request, searchterm):
+#	items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm))
+#	return render_to_response('core/items.html', {'items':items})
+
 @login_required()
 def filter_search(request, searchterm):
-	items = Item.objects.filter(Q(title__icontains=searchterm) | Q(content__icontains=searchterm))
-	return render_to_response('core/items.html', {'items':items})
+	tagids = [int(r['id']) for r in sphinxclient.Query(searchterm, index='tags')['matches']]
+	itemids = [int(r['id']) for r in sphinxclient.Query(searchterm, index='items')['matches']]
+
+	for i in SearchCache.objects.filter(text__icontains=searchterm):
+		if i.model == 'Tag':
+			tagids.append(i.item_id)
+		else:
+			itemids.append(i.item_id)
+
+
+	items = Item.objects.filter(Q(id__in=itemids) | Q(tags__id__in=set(tagids)))
+	return render_to_response('core/items.html', {'items':set(items)})
 
 
 ############################
@@ -153,7 +177,21 @@ def item(request):
 
 		f = ItemForm(postdata)
 		if f.is_valid():
-			f.save()
+			i = f.save()
+
+			cache = SearchCache()
+			cache.item_id = i.id
+			cache.text = i.title +' '+ i.content
+			cache.model = 'Item'
+			cache.save()
+
+
+			cache = SearchCache()
+			cache.item_id = t.id
+			cache.text = t.name
+			cache.model = 'Tag'
+			cache.save()
+
 
 			return HttpResponseRedirect('/')
 		else:
@@ -173,7 +211,14 @@ def item_edit(request, id):
 	if request.method == 'POST':
 		f = ItemForm(request.POST, instance=i)		
 		if f.is_valid():
-			f.save()
+			i = f.save()
+			
+			cache = SearchCache()
+			cache.item_id = i.id
+			cache.text = i.title +' '+ i.content
+			cache.model = 'Item'
+			cache.save()
+
 			return HttpResponseRedirect('/')
 
 	else:		
@@ -204,7 +249,14 @@ def tag(request):
 	if request.method == 'POST':
 		f = TagForm(request.POST)
 		if f.is_valid():
-			f.save()
+			t = f.save()
+
+			cache = SearchCache()
+			cache.item_id = t.id
+			cache.text = t.name
+			cache.model = 'Tag'
+			cache.save()
+
 			return HttpResponseRedirect('/')
 	else:
 		f = TagForm()
@@ -219,7 +271,14 @@ def tag_edit(request, id):
 	if request.method == 'POST':
 		f = TagForm(request.POST, instance=i)
 		if f.is_valid():
-			f.save()
+			t = f.save()
+
+			cache = SearchCache()
+			cache.item_id = t.id
+			cache.text = t.name
+			cache.model = 'Tag'
+			cache.save()
+
 			return HttpResponseRedirect('/')
 	else:
 		f = TagForm(instance=i)

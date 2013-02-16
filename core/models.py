@@ -29,6 +29,7 @@ class Item(models.Model):
 	class Meta:
 		ordering = ['-added']
 
+
 class BannedIP(models.Model):
 	ip = models.IPAddressField(max_length=20)
 	added = models.DateTimeField(auto_now=True)
@@ -37,6 +38,12 @@ class BannedIP(models.Model):
 class FailedLogin(models.Model):
 	ip = models.IPAddressField(max_length=20)
 	added = models.DateTimeField(auto_now=True)
+
+
+class SearchCache(models.Model):
+	item_id = models.IntegerField()
+	text = models.CharField(max_length=10000)
+	model = models.CharField(max_length=100)
 
 
 ##################
