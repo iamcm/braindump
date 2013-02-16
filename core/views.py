@@ -185,12 +185,12 @@ def item(request):
 			cache.model = 'Item'
 			cache.save()
 
-
-			cache = SearchCache()
-			cache.item_id = t.id
-			cache.text = t.name
-			cache.model = 'Tag'
-			cache.save()
+			if request.POST.get('newTag'):
+				cache = SearchCache()
+				cache.item_id = t.id
+				cache.text = t.name
+				cache.model = 'Tag'
+				cache.save()
 
 
 			return HttpResponseRedirect('/')
