@@ -34,7 +34,7 @@ sphinxclient = sphinxapi.SphinxClient()
 def add_to_sphinx(index, id, text):
 	conn = MySQLdb.connect(host='127.0.0.1', port=9306)
 	cursor = conn.cursor()
-	cursor.execute("REPLACE INTO rt_%s (id, text) VALUES (%s, '%s')" % (index, str(id), text))
+	cursor.execute("REPLACE INTO rt_%s (id, text) VALUES (%s, '%s')" % (index, str(id), text.replace("'","") ))
 	conn.commit()
 
 def remove_from_sphinx(index, id):
