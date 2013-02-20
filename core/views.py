@@ -14,7 +14,15 @@ import string
 from random import sample
 from braindump import settings
 #sphinx related
-import pymysql
+try:
+	import MySQLdb
+except:
+	"""
+	live server has MySQLdb installed by default but locally i would need to install the mysql 
+	client libraries (maybe even mysql?) so i opt for a pure python mysql client as its required
+	for sphinx interations
+	"""
+	import pymysql as MySQLdb
 import sys
 sys.path.append(settings.SPHINX_PATH)
 import sphinxapi
@@ -24,13 +32,13 @@ import sphinxapi
 sphinxclient = sphinxapi.SphinxClient()	
 
 def add_to_sphinx(index, id, text):
-	conn = pymysql.connect(host='127.0.0.1', port=9306)
+	conn = MySQLdb.connect(host='127.0.0.1', port=9306)
 	cursor = conn.cursor()
 	cursor.execute("REPLACE INTO rt_%s (id, text) VALUES (%s, '%s')" % (index, str(id), text))
 	conn.commit()
 
 def remove_from_sphinx(index, id):
-	conn = pymysql.connect(host='127.0.0.1', port=9306)
+	conn = MySQLdb.connect(host='127.0.0.1', port=9306)
 	cursor = conn.cursor()
 	cursor.execute("DELETE FROM rt_%s WHERE id=%s" % (index, str(id)))
 	conn.commit()
