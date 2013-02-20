@@ -22,7 +22,7 @@ class Tag(models.Model):
 
 class Item(models.Model):
 	title = models.CharField(max_length=200)
-	content = models.CharField(max_length=10000)
+	content = models.CharField(max_length=100000)
 	tags = models.ManyToManyField(Tag)
 	added = models.DateField(auto_now=True)
 
@@ -38,12 +38,6 @@ class BannedIP(models.Model):
 class FailedLogin(models.Model):
 	ip = models.IPAddressField(max_length=20)
 	added = models.DateTimeField(auto_now=True)
-
-
-class SearchCache(models.Model):
-	item_id = models.IntegerField()
-	text = models.CharField(max_length=10000)
-	model = models.CharField(max_length=100)
 
 
 ##################

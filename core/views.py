@@ -1,5 +1,5 @@
 from django.shortcuts import redirect, render_to_response, HttpResponseRedirect, HttpResponse
-from core.models import Item, Tag, FailedLogin, BannedIP, User, SearchCache
+from core.models import Item, Tag, FailedLogin, BannedIP, User
 from core.forms import ItemForm, TagForm, LoginForm
 from django.template import RequestContext
 from django.db.models import Q
@@ -12,17 +12,30 @@ from urlparse import urlparse
 from datetime import datetime, timedelta
 import string
 from random import sample
-############################
-############################
-
 from braindump import settings
+#sphinx related
+import pymysql
+import sys
+sys.path.append(settings.SPHINX_PATH)
+import sphinxapi
+############################
+############################
 
-if settings.SPHINX_PATH:
-	import sys
-	sys.path.append(settings.SPHINX_PATH)
+sphinxclient = sphinxapi.SphinxClient()	
 
-	import sphinxapi
-	sphinxclient = sphinxapi.SphinxClient()
+def add_to_sphinx(index, id, text):
+	conn = pymysql.connect(host='127.0.0.1', port=9306)
+	cursor = conn.cursor()
+	cursor.execute("REPLACE INTO rt_%s (id, text) VALUES (%s, '%s')" % (index, str(id), text))
+	conn.commit()
+
+def remove_from_sphinx(index, id):
+	conn = pymysql.connect(host='127.0.0.1', port=9306)
+	cursor = conn.cursor()
+	cursor.execute("DELETE FROM rt_%s WHERE id=%s" % (index, str(id)))
+	conn.commit()
+
+
 
 def generate_api_key():
 	key = ''
@@ -141,15 +154,8 @@ def filter_tag(request, slug):
 
 @login_required()
 def filter_search(request, searchterm):
-	tagids = [int(r['id']) for r in sphinxclient.Query(searchterm, index='tags')['matches']]
-	itemids = [int(r['id']) for r in sphinxclient.Query(searchterm, index='items')['matches']]
-
-	for i in SearchCache.objects.filter(text__icontains=searchterm):
-		if i.model == 'Tag':
-			tagids.append(i.item_id)
-		else:
-			itemids.append(i.item_id)
-
+	tagids = [int(r['id']) for r in sphinxclient.Query(searchterm+'*', index='rt_tag')['matches']]
+	itemids = [int(r['id']) for r in sphinxclient.Query(searchterm+'*', index='rt_item')['matches']]
 
 	items = Item.objects.filter(Q(id__in=itemids) | Q(tags__id__in=set(tagids)))
 	return render_to_response('core/items.html', {'items':set(items)})
@@ -179,23 +185,16 @@ def item(request):
 		if f.is_valid():
 			i = f.save()
 
-			cache = SearchCache()
-			cache.item_id = i.id
-			cache.text = i.title +' '+ i.content
-			cache.model = 'Item'
-			cache.save()
+			add_to_sphinx('item', i.id, i.title +' '+i.content)
 
 			if request.POST.get('newTag'):
-				cache = SearchCache()
-				cache.item_id = t.id
-				cache.text = t.name
-				cache.model = 'Tag'
-				cache.save()
+				add_to_sphinx('tag', t.id, t.name)
 
 
 			return HttpResponseRedirect('/')
 		else:
 			if t:
+				remove_from_sphinx('tag', t.id)
 				t.delete()
 
 	else:
@@ -213,11 +212,7 @@ def item_edit(request, id):
 		if f.is_valid():
 			i = f.save()
 			
-			cache = SearchCache()
-			cache.item_id = i.id
-			cache.text = i.title +' '+ i.content
-			cache.model = 'Item'
-			cache.save()
+			add_to_sphinx('item', i.id, i.title +' '+i.content)
 
 			return HttpResponseRedirect('/')
 
@@ -231,6 +226,8 @@ def item_edit(request, id):
 def item_delete(request, id):
 	i = Item(id)
 	i.delete()
+
+	remove_from_sphinx('item', id)
 	
 	return HttpResponseRedirect('/')
 
@@ -251,11 +248,7 @@ def tag(request):
 		if f.is_valid():
 			t = f.save()
 
-			cache = SearchCache()
-			cache.item_id = t.id
-			cache.text = t.name
-			cache.model = 'Tag'
-			cache.save()
+			add_to_sphinx('tag', t.id, t.name)
 
 			return HttpResponseRedirect('/')
 	else:
@@ -273,11 +266,7 @@ def tag_edit(request, id):
 		if f.is_valid():
 			t = f.save()
 
-			cache = SearchCache()
-			cache.item_id = t.id
-			cache.text = t.name
-			cache.model = 'Tag'
-			cache.save()
+			add_to_sphinx('tag', t.id, t.name)
 
 			return HttpResponseRedirect('/')
 	else:
@@ -291,6 +280,8 @@ def tag_delete(request, id):
 	i = Tag(id)
 	i.delete()
 	
+	remove_from_sphinx('tag', id)
+
 	return HttpResponseRedirect('/')	
 
 @login_required()
@@ -368,7 +359,9 @@ def api_save_item(request):
 	if request.method == 'POST':
 		f = ItemForm(request.POST)
 		if f.is_valid():
-			f.save()
+			i = f.save()
+
+			add_to_sphinx('item', i.id, i.title +' '+i.content)
 
 	return JSONResponse([], request.GET.get('callback'))
 
