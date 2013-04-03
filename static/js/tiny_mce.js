@@ -2,7 +2,8 @@
  tinyMCE.init({
      mode : "textareas",
      theme : "advanced",
-     height: '350',
+     height: '250',
+     width:'100%',
      content_css : "/static/css/tiny_mce.css",
      
      theme_advanced_buttons1 : "bold,italic,underline,|,bullist,numlist,link,|,styleselect, fontselect, fontsizeselect,|,forecolor,backcolor",
