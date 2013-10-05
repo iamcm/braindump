@@ -423,7 +423,7 @@ def index():
 def index():
     em = EntityManager()
 
-    user = em.find_one('User', {'_id':bottle.session.userid})
+    user = em.find_one('User', {'_id':bottle.session.user_id})
 
     return bottle.template('api-key.tpl', vd=common_view_data({'key':user.api_key}))
 
@@ -433,7 +433,7 @@ def index():
 def index():
     a = AuthService(EntityManager())
 
-    a.generate_api_key(bottle.session.userid)
+    a.generate_api_key(bottle.session.user_id)
 
     return bottle.redirect('/api-key')
 
