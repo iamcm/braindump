@@ -79,7 +79,7 @@ def checklogin(callback, redirect_url='/login'):
 
         
         elif bottle.request.GET.get('apikey'):
-            users = self.em.find('User', {'api_key':bottle.request.GET.get('apikey')})
+            users = EntityManager().find('User', {'api_key':bottle.request.GET.get('apikey'), 'valid':True})
 
             if len(users)==1:
                 return callback(*args, **kwargs)
@@ -161,8 +161,8 @@ def forgotten_password():
 
     if token:
         e = Email(recipients=[e])
-        body = 'You have requested to reset your password for www.fotodelic.co.uk, please follow this link to reset it:\n\r\n https://%s/reset-password/%s' % (bottle.request.environ['HTTP_HOST'], token)
-        e.send('Fotodelic - password reset request', body)               
+        body = 'You have requested to reset your password, please follow this link to reset it:\n\r\n https://%s/reset-password/%s' % (bottle.request.environ['HTTP_HOST'], token)
+        e.send('Password reset request', body)               
 
         return bottle.redirect('/forgotten-password-sent')
 
@@ -215,11 +215,13 @@ def index():
 
 
 
+def get_tags():
+    return EntityManager().find('Tag', sort=[('slug', 1)])
 
 
 def common_view_data(extradata=None):
     vd = {
-        'tags': EntityManager().find('Tag', sort=[('slug', 1)])
+        'tags': get_tags()
     }
 
     if extradata:
@@ -273,7 +275,11 @@ def index(slug):
         }
         items = em.find('Item', criteria, sort=[('added', -1)])
 
-        return bottle.template('index.tpl', vd=common_view_data({'items':items}))
+        if bottle.request.GET.get('apikey'):
+            bottle.response.content_type = 'text/json'
+            return json.dumps([em.entity_to_json_safe_dict(i) for i in items])
+        else:
+            return bottle.template('index.tpl', vd=common_view_data({'items':items}))
         
     else:
         return bottle.HTTPError(400)
@@ -286,7 +292,11 @@ def index():
 
     items = em.find('Item', sort=[('added', -1)])
 
-    return bottle.template('index.tpl', vd=common_view_data({'items':items}))
+    if bottle.request.GET.get('apikey'):
+        bottle.response.content_type = 'text/json'
+        return json.dumps([em.entity_to_json_safe_dict(i) for i in items])
+    else:
+        return bottle.template('index.tpl', vd=common_view_data({'items':items}))
 
 
 @bottle.route('/item', method='GET')
@@ -320,6 +330,16 @@ def index(itemid):
     return bottle.template('item.tpl', vd=common_view_data({'item':item}))
 
 
+@bottle.route('/item/:itemid/content', method='GET')
+@checklogin
+def index(itemid):
+    em = EntityManager()
+    
+    item = em.find_one_by_id('Item', itemid)
+
+    return item.content.replace('\n','<br />')
+
+
 @bottle.route('/item/:itemid/edit', method='POST')
 @checklogin
 def index(itemid):
@@ -338,7 +358,17 @@ def index(itemid):
     return bottle.redirect('/items')
 
 
-@bottle.route('/item/:itemid/delete')
+@bottle.route('/item/:itemid/delete', method='GET')
+@checklogin
+def index(itemid):
+    em = EntityManager()
+    
+    em.remove_one('Item', itemid)
+
+    return bottle.redirect('/items')
+
+
+@bottle.route('/item/:itemid/delete', method='POST')
 @checklogin
 def index(itemid):
     em = EntityManager()
@@ -355,7 +385,11 @@ def index(itemid):
 @bottle.route('/tags')
 @checklogin
 def index():
-    return bottle.template('tags.tpl', vd=common_view_data())
+    if bottle.request.GET.get('apikey'):
+        bottle.response.content_type = 'text/json'
+        return json.dumps([EntityManager().entity_to_json_safe_dict(t) for t in get_tags()])
+    else:
+        return bottle.template('tags.tpl', vd=common_view_data())
 
 
 @bottle.route('/tag', method='GET')
@@ -412,12 +446,6 @@ def index(tagid):
     return bottle.redirect('/tags')
 
 
-@bottle.route('/tags')
-@checklogin
-def index():
-    return bottle.template('tags.tpl', vd=common_view_data())
-
-
 @bottle.route('/api-key', method='GET')
 @checklogin
 def index():
@@ -438,11 +466,19 @@ def index():
     return bottle.redirect('/api-key')
 
 
+@bottle.route('/search/:searchterm')
+def api_search(searchterm):
+    return run_search(searchterm)
+
+
 @bottle.route('/search/items')
 @checklogin
-def index():
+def search():
     searchterm = bottle.request.GET.get('name')
-    
+    return run_search(searchterm)
+
+
+def run_search(searchterm):
     em = EntityManager()
 
     raw_items = em.fuzzy_text_search('Item', searchterm, 'title')
@@ -455,8 +491,13 @@ def index():
             ids.append(i._id)
             items.append(i)
 
-    if bottle.request.GET.get('ajax') == "1":
+    if bottle.request.GET.get('apikey'):
+        bottle.response.content_type = 'text/json'
+        return json.dumps([em.entity_to_json_safe_dict(i) for i in items])
+
+    elif bottle.request.GET.get('ajax') == "1":
         return bottle.template('items.tpl', {'items':items})
+
     else:
         return bottle.template('index.tpl', vd=common_view_data({'items':items}))
 
