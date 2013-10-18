@@ -8,28 +8,10 @@
     </div>
     %end
 
-    <form class="form-horizontal" id="loginForm" method='POST' action="/login" >
-        
-        <div class="control-group">
-            <div class="controls">
-                <input type="text" class="input-xlarge" name="email" id="email" value="{{vd.get('email') if vd.get('email') else ''}}" placeholder="Email" />
-            </div>
-        </div>
-        
-        <div class="control-group">
-            <div class="controls">
-                <input type="password" class="input-xlarge" name="password" id="password" value="{{vd.get('password') if vd.get('password') else ''}}" placeholder="Password" />
-            </div>
-        </div>
-        
-        <div class="control-group">
-            <div class="controls">
-                <button type="submit" class="btn">Login</button>
-                - <a href="/forgotten-password">Forgotten password?</a>
-            </div>
-        </div>
-        
-    </form>
+    {{!vd['form']}}
+
+    <a href="/auth/forgotten-password">Forgotten password?</a>
+
 </div>
 
 %rebase base_public

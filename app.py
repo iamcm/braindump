@@ -7,17 +7,19 @@ import bottle
 import settings
 from Helpers import logger
 from EntityManager import EntityManager
-from Auth.auth import AuthService, User
+from Auth.auth import AuthService, User, AuthPlugin
+from Auth.apps import auth_app
 from models.Models import *
 from Helpers.emailHelper import Email
 
+auth_plugin = AuthPlugin(EntityManager())
 
 
 #######################################################
 # Static files
 #######################################################
 if settings.PROVIDE_STATIC_FILES:
-    @bottle.route('/static/<filepath:path>')
+    @bottle.route('/static/<filepath:path>', skip=True)
     def index(filepath):
         return bottle.static_file(filepath, root=settings.ROOTPATH +'/static/')
 
@@ -52,166 +54,6 @@ def ForceHTTPS(callback):
     return wrapper
 
 
-def checklogin(callback, redirect_url='/login'):
-    def wrapper(*args, **kwargs):
-
-        if bottle.request.get_cookie('token'):
-            a = AuthService(EntityManager())
-            
-            session =  a.check_session(bottle.request.get_cookie('token')
-                                        , bottle.request.get('REMOTE_ADDR')
-                                        , bottle.request.get('HTTP_USER_AGENT'))
-
-            if not session:
-                if redirect_url is not None:
-                    return bottle.redirect(redirect_url)
-                else:
-                    return bottle.HTTPError(403, 'Access denied')
-
-            else:
-                bottle.response.set_cookie('token', str(session.public_id),\
-                                       expires=session.expires,\
-                                        httponly=True, path='/')
-                
-                bottle.session = session
-
-                return callback(*args, **kwargs)
-
-        
-        elif bottle.request.GET.get('apikey'):
-            users = EntityManager().find('User', {'api_key':bottle.request.GET.get('apikey'), 'valid':True})
-
-            if len(users)==1:
-                return callback(*args, **kwargs)
-            else:
-                return bottle.HTTPError(403, 'Access denied')
-
-        else:
-            if redirect_url is not None:
-                return bottle.redirect(redirect_url)
-            else:
-                return bottle.HTTPError(403, 'Access denied')
-
-    return wrapper
-
-
-
-
-
-#######################################################
-# Main app routes
-#######################################################
-@bottle.route('/login')
-def login():
-    return bottle.template('login.tpl', vd={})
-
-
-@bottle.route('/login', method='POST')
-def login():
-    e = bottle.request.POST.get('email')
-    p = bottle.request.POST.get('password')
-    ip = bottle.request.get('REMOTE_ADDR')
-    ua = bottle.request.get('HTTP_USER_AGENT')
-
-    error = None
-
-    if e and p:
-        a = AuthService(EntityManager())
-
-        session = a.login(e, p, ip, ua)
-
-        if session:
-            bottle.response.set_cookie('token', str(session.public_id),\
-                                       expires=session.expires,\
-                                        httponly=True, path='/')
-
-            # bottle.redirect('/') //this clears cookies
-            res = bottle.HTTPResponse("", status=302, Location="/")
-            res._cookies = bottle.response._cookies
-            return res
-
-        else:
-            error = a.errors[0]
-
-    return bottle.template('login.tpl', vd={
-            'error':error
-        })
-
-@bottle.route('/logout')
-@checklogin
-def logout():
-    a = AuthService(EntityManager())
-    a.logout(bottle.session)
-
-    bottle.redirect('/')
-
-
-
-@bottle.route('/forgotten-password', method='GET')
-def forgotten_password():
-    return bottle.template('forgotten_password', vd={})
-
-
-@bottle.route('/forgotten-password', method='POST')
-def forgotten_password():
-    e = bottle.request.POST.get('email')
-
-    a = AuthService(EntityManager())
-    token = a.generate_password_token(e)
-
-    if token:
-        e = Email(recipients=[e])
-        body = 'You have requested to reset your password, please follow this link to reset it:\n\r\n https://%s/reset-password/%s' % (bottle.request.environ['HTTP_HOST'], token)
-        e.send('Password reset request', body)               
-
-        return bottle.redirect('/forgotten-password-sent')
-
-
-    return bottle.template('forgotten_password', vd={
-            'error':a.errors[0]
-        })
-
-
-
-@bottle.route('/forgotten-password-sent', method='GET')
-def forgotten_password():
-    return bottle.template('forgotten_password_sent', vd={})
-
-
-
-@bottle.route('/reset-password/:key', method='GET')
-def index(key):
-    return bottle.template('reset_password', vd={'key':key})
-
-
-@bottle.route('/reset-password/:key', method='POST')
-def index(key):
-    k = bottle.request.POST.get('key')
-    p = bottle.request.POST.get('password')
-    p2 = bottle.request.POST.get('password2')
-    error = None
-
-    if (p and p2) and (p==p2):
-        a = AuthService(EntityManager())
-        if a.reset_password(key, p):
-            return bottle.redirect('/reset-password-success')
-
-        else:
-            error = a.errors[0]
-
-    else:
-        error = 'Please enter two matching passwords'
-
-
-    return bottle.template('reset_password', vd={
-        'error': error
-        })
-
-
-
-@bottle.route('/reset-password-success', method='GET')
-def index():
-    return bottle.template('reset_password_success', vd={})
 
 
 
@@ -255,13 +97,11 @@ def save_item(item, title, content, tagIds, newtagname):
 # Main app routes
 #######################################################
 @bottle.route('/')
-@checklogin
 def index(): 
     return bottle.template('index.tpl', vd=common_view_data())
 
 
 @bottle.route('/tag/:slug')
-@checklogin
 def index(slug):
     em = EntityManager()
 
@@ -286,7 +126,6 @@ def index(slug):
 
 
 @bottle.route('/items')
-@checklogin
 def index():
     em = EntityManager()
 
@@ -300,14 +139,12 @@ def index():
 
 
 @bottle.route('/item', method='GET')
-@checklogin
 def index():
     return bottle.template('item.tpl', vd=common_view_data({'item':Item()}))
 
 
 
 @bottle.route('/item', method='POST')
-@checklogin
 def index():
     t = bottle.request.POST.get('title')
     c = bottle.request.POST.get('content')
@@ -321,7 +158,6 @@ def index():
 
 
 @bottle.route('/item/:itemid/edit', method='GET')
-@checklogin
 def index(itemid):
     em = EntityManager()
     
@@ -331,7 +167,6 @@ def index(itemid):
 
 
 @bottle.route('/item/:itemid/content', method='GET')
-@checklogin
 def index(itemid):
     em = EntityManager()
     
@@ -341,7 +176,6 @@ def index(itemid):
 
 
 @bottle.route('/item/:itemid/edit', method='POST')
-@checklogin
 def index(itemid):
     t = bottle.request.POST.get('title')
     c = bottle.request.POST.get('content')
@@ -359,7 +193,6 @@ def index(itemid):
 
 
 @bottle.route('/item/:itemid/delete', method='GET')
-@checklogin
 def index(itemid):
     em = EntityManager()
     
@@ -369,7 +202,6 @@ def index(itemid):
 
 
 @bottle.route('/item/:itemid/delete', method='POST')
-@checklogin
 def index(itemid):
     em = EntityManager()
     
@@ -383,7 +215,6 @@ def index(itemid):
 
 
 @bottle.route('/tags')
-@checklogin
 def index():
     if bottle.request.GET.get('apikey'):
         bottle.response.content_type = 'text/json'
@@ -393,13 +224,11 @@ def index():
 
 
 @bottle.route('/tag', method='GET')
-@checklogin
 def index():
     return bottle.template('tag.tpl', vd={'tag':Tag()})
 
 
 @bottle.route('/tag', method='POST')
-@checklogin
 def index():
     if bottle.request.POST.get('name') and bottle.request.POST.get('name').strip() != '':
         em = EntityManager()
@@ -413,7 +242,6 @@ def index():
 
 
 @bottle.route('/tag/:tagid/edit', method='GET')
-@checklogin
 def index(tagid):
     em = EntityManager()
     tag = em.find_one_by_id('Tag', tagid)
@@ -422,7 +250,6 @@ def index(tagid):
 
 
 @bottle.route('/tag/:tagid/edit', method='POST')
-@checklogin
 def index(tagid):
     if bottle.request.POST.get('name') and bottle.request.POST.get('name').strip() != '':
         em = EntityManager()
@@ -437,7 +264,6 @@ def index(tagid):
 
 
 @bottle.route('/tag/:tagid/delete')
-@checklogin
 def index(tagid):
     em = EntityManager()
     
@@ -447,7 +273,6 @@ def index(tagid):
 
 
 @bottle.route('/api-key', method='GET')
-@checklogin
 def index():
     em = EntityManager()
 
@@ -457,7 +282,6 @@ def index():
 
 
 @bottle.route('/api-key', method='POST')
-@checklogin
 def index():
     a = AuthService(EntityManager())
 
@@ -472,7 +296,6 @@ def api_search(searchterm):
 
 
 @bottle.route('/search/items')
-@checklogin
 def search():
     searchterm = bottle.request.GET.get('name')
     return run_search(searchterm)
@@ -509,6 +332,9 @@ def run_search(searchterm):
 
 
 app = bottle.app()
+app.install(auth_plugin)
+app.mount('/auth/', auth_app)
+
 
 if __name__ == '__main__':
     with open(settings.ROOTPATH +'/app.pid','w') as f:

@@ -6,13 +6,7 @@
         <title>Login</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-        <link href="/static/css/bootstrap.css" rel="stylesheet">
-        <style>
-            body {
-                padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
-            }
-        </style>
-        <link href="/static/css/bootstrap-responsive.css" rel="stylesheet">
+        <link href="/static/bootstrap/css/bootstrap.css" rel="stylesheet">
         <link href="/static/css/generic.css" rel="stylesheet">
         %if defined('css'):
             %css()
