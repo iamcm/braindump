@@ -11,8 +11,9 @@ from Auth.auth import AuthService, User, AuthPlugin
 from Auth.apps import auth_app
 from models.Models import *
 from Helpers.emailHelper import Email
-from BottlePlugins import ViewdataPlugin, FormBinderPlugin
+from BottlePlugins import ViewdataPlugin
 from forms.Forms import *
+from FormBinder import FormBinderPlugin
 
 auth_plugin = AuthPlugin(EntityManager())
 form_binder_plugin = FormBinderPlugin()
@@ -228,6 +229,7 @@ def index():
     })
 
     return bottle.template('tag.tpl', vd=bottle.response.viewdata)
+
 
 @bottle.route('/tag/:tagid/edit', method='GET')
 def index(tagid):
