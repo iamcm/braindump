@@ -175,9 +175,9 @@
 .px30{padding:0 30px}
 .py30{padding:30px 0}
 
-.m2{padding:2px}
-.mx2{padding:0 2px}
-.my2{padding:2px 0}
+.m2{margin:2px}
+.mx2{margin:0 2px}
+.my2{margin:2px 0}
 
 .m5{margin:5px}
 .mx5{margin:0 5px}

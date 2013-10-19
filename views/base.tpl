@@ -28,6 +28,12 @@
                     <li><a href="/tags">Tags</a></li>
                     <li><a href="/api-key">Api key</a></li>
                 </ul>
+
+                %if vd['logged_in_user']:
+                <ul class="nav navbar-nav pull-right">
+                    <li><a href="/auth/logout">Logout</a></li>
+                </ul>
+                %end
             </div>
         </div>
     </div>

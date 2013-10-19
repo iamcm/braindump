@@ -25,6 +25,21 @@ $(document).ready(function(){
 	});	
 
 
+	$('#tagIds').hide();
+	$('#tagIds').parent().append('<br />');
+	$('#tagIds option').each(function(){
+		if($(this)[0].selected){
+			classname = 'btn btn-primary'
+		} else {
+			classname = 'btn'
+		}
+		
+		var el = '<button class="tag m2 '+ classname +'" id="'+ $(this).val() +'">'+ $(this).text() +'</button>';
+		
+		$('#tagIds').parent().append(el);
+	});
+	$('#tagIds').remove();
+
     $('#form-add-item .tag').on('click', function(ev){
         ev.preventDefault();
         $(this).toggleClass('btn-primary');
@@ -32,7 +47,7 @@ $(document).ready(function(){
 
     $('#form-add-item').on('submit', function(ev){
     	$('.tag.btn-primary').each(function(){
-            $('#form-add-item').append('<input type="hidden" name="tagIds[]" value="'+ this.id +'" />');
+            $('#form-add-item').append('<input type="hidden" name="tagIds" value="'+ this.id +'" />');
         });	
     });
     

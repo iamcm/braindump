@@ -11,8 +11,11 @@ from Auth.auth import AuthService, User, AuthPlugin
 from Auth.apps import auth_app
 from models.Models import *
 from Helpers.emailHelper import Email
+from BottlePlugins import ViewdataPlugin, FormBinderPlugin
+from forms.Forms import *
 
 auth_plugin = AuthPlugin(EntityManager())
+form_binder_plugin = FormBinderPlugin()
 
 
 #######################################################
@@ -29,59 +32,30 @@ if settings.PROVIDE_STATIC_FILES:
 #######################################################
 # Decorators
 #######################################################
-def JSONResponse(callback):
-    def wrapper(*args, **kwargs):
-        bottle.response.content_type = 'text/json'
-        return callback(*args, **kwargs)
-    return wrapper
-
-
-def ForceHTTP(callback):
-    def wrapper(*args, **kwargs):
-        if bottle.request.environ.get('HTTP_HTTPS') == 'on':
-            return bottle.redirect(bottle.request.url.replace('https://','http://'))
-
-        return callback(*args, **kwargs)
-    return wrapper
-
-
-def ForceHTTPS(callback):
-    def wrapper(*args, **kwargs):
-        if bottle.request.environ.get('HTTP_HTTPS') == 'off':
-            return bottle.redirect(bottle.request.url.replace('http://','https://'))
-
-        return callback(*args, **kwargs)
-    return wrapper
-
-
-
-
 
 def get_tags():
     return EntityManager().find('Tag', sort=[('slug', 1)])
 
 
-def common_view_data(extradata=None):
-    vd = {
-        'tags': get_tags()
-    }
+def common_view_data():
+    if bottle.request.session:
+        user = EntityManager().find_one_by_id('User', bottle.request.session.user_id)
+    else:
+        user = None
 
-    if extradata:
-        vd.update(extradata)
+    vd = {
+        'tags': get_tags(),
+        'logged_in_user': user
+    }
 
     return vd
 
+viewdata_plugin = ViewdataPlugin(callback_function=common_view_data)
 
 
 
-def save_item(item, title, content, tagIds, newtagname):
+def save_item(item, newtagname):
     em = EntityManager()
-
-    item.title = title
-    item.content = content
-    item.tagIds = []
-    for tagId in tagIds:
-        item.tagIds.append(tagId)
 
     if newtagname:
         t = Tag()
@@ -98,7 +72,7 @@ def save_item(item, title, content, tagIds, newtagname):
 #######################################################
 @bottle.route('/')
 def index(): 
-    return bottle.template('index.tpl', vd=common_view_data())
+    return bottle.template('index.tpl', vd=bottle.response.viewdata)
 
 
 @bottle.route('/tag/:slug')
@@ -119,7 +93,8 @@ def index(slug):
             bottle.response.content_type = 'text/json'
             return json.dumps([em.entity_to_json_safe_dict(i) for i in items])
         else:
-            return bottle.template('index.tpl', vd=common_view_data({'items':items}))
+            bottle.response.viewdata.update({'items':items})
+            return bottle.template('index.tpl', vd=bottle.response.viewdata)
         
     else:
         return bottle.HTTPError(400)
@@ -135,26 +110,39 @@ def index():
         bottle.response.content_type = 'text/json'
         return json.dumps([em.entity_to_json_safe_dict(i) for i in items])
     else:
-        return bottle.template('index.tpl', vd=common_view_data({'items':items}))
+        bottle.response.viewdata.update({'items':items})
+        return bottle.template('index.tpl', vd=bottle.response.viewdata)
 
 
 @bottle.route('/item', method='GET')
 def index():
-    return bottle.template('item.tpl', vd=common_view_data({'item':Item()}))
+    tags_select_items = [(str(t._id), t.name) for t in get_tags()]
+    bottle.response.viewdata.update({
+        'form': ItemForm(tags_select_items).get_html(form_id='form-add-item', row_class='form-group', submit_btn_class='btn btn-primary')
+    })
+
+    return bottle.template('item.tpl', vd=bottle.response.viewdata)
 
 
 
-@bottle.route('/item', method='POST')
+@bottle.route('/item', method='POST', apply=[form_binder_plugin], form=ItemForm)
 def index():
-    t = bottle.request.POST.get('title')
-    c = bottle.request.POST.get('content')
-    tagIds = bottle.request.POST.getall('tagIds[]')
-    newtagname = bottle.request.POST.get('tag')
+    form = bottle.request.form
 
-    if (t and tagIds) or (t and newtagname):
-        save_item(Item(), t, c, tagIds, newtagname)
+    if form.is_valid():
+        i = form.hydrate_entity(Item())
+        save_item(i, form.get_value('newTag'))
+        return bottle.redirect('/items')        
 
-    return bottle.redirect('/items')
+    for item in form.formitems:
+        if item.name == 'tagIds':
+            item.select_list_items = [(str(t._id), t.name) for t in get_tags()]
+
+    bottle.response.viewdata.update({
+        'form': form.get_html(row_class='form-group', submit_btn_class='btn btn-primary')
+    })    
+
+    return bottle.template('item.tpl', vd=bottle.response.viewdata)
 
 
 @bottle.route('/item/:itemid/edit', method='GET')
@@ -163,7 +151,13 @@ def index(itemid):
     
     item = em.find_one_by_id('Item', itemid)
 
-    return bottle.template('item.tpl', vd=common_view_data({'item':item}))
+    tags_select_items = [(str(t._id), t.name) for t in get_tags()]
+
+    bottle.response.viewdata.update({
+        'form': ItemForm(tags_select_items, entity=item).get_html(form_id='form-add-item', action='/item', row_class='form-group', submit_btn_class='btn btn-primary')
+    })
+
+    return bottle.template('item.tpl', vd=bottle.response.viewdata)
 
 
 @bottle.route('/item/:itemid/content', method='GET')
@@ -173,23 +167,6 @@ def index(itemid):
     item = em.find_one_by_id('Item', itemid)
 
     return item.content.replace('\n','<br />')
-
-
-@bottle.route('/item/:itemid/edit', method='POST')
-def index(itemid):
-    t = bottle.request.POST.get('title')
-    c = bottle.request.POST.get('content')
-    tagIds = bottle.request.POST.getall('tagIds[]')
-    newtagname = bottle.request.POST.get('tag')
-
-    if (t and tagIds) or (t and newtagname):
-        em = EntityManager()
-
-        i = em.find_one_by_id('Item', itemid)
-
-        save_item(i, t, c, tagIds, newtagname)
-
-    return bottle.redirect('/items')
 
 
 @bottle.route('/item/:itemid/delete', method='GET')
@@ -220,47 +197,48 @@ def index():
         bottle.response.content_type = 'text/json'
         return json.dumps([EntityManager().entity_to_json_safe_dict(t) for t in get_tags()])
     else:
-        return bottle.template('tags.tpl', vd=common_view_data())
+        return bottle.template('tags.tpl', vd=bottle.response.viewdata)
 
 
 @bottle.route('/tag', method='GET')
 def index():
-    return bottle.template('tag.tpl', vd={'tag':Tag()})
+    bottle.response.viewdata.update({
+        'form': TagForm().get_html(row_class='form-group', submit_btn_class='btn btn-primary')
+    })
+
+    return bottle.template('tag.tpl', vd=bottle.response.viewdata)
 
 
-@bottle.route('/tag', method='POST')
+@bottle.route('/tag', method='POST', apply=[form_binder_plugin], form=TagForm)
 def index():
-    if bottle.request.POST.get('name') and bottle.request.POST.get('name').strip() != '':
+    form = bottle.request.form
+
+    if form.is_valid():
         em = EntityManager()
 
-        t = Tag()
-        t.name = bottle.request.POST.get('name')
+        t = form.hydrate_entity(Tag())
         
         em.save('Tag', t)
 
-    return bottle.redirect('/tags')
+        return bottle.redirect('/tags')
 
+
+    bottle.response.viewdata.update({
+        'form': form.get_html(row_class='form-group', submit_btn_class='btn btn-primary')
+    })
+
+    return bottle.template('tag.tpl', vd=bottle.response.viewdata)
 
 @bottle.route('/tag/:tagid/edit', method='GET')
 def index(tagid):
     em = EntityManager()
     tag = em.find_one_by_id('Tag', tagid)
 
-    return bottle.template('tag.tpl', vd={'tag':tag})
+    bottle.response.viewdata.update({
+        'form': TagForm(entity=tag).get_html(action='/tag', row_class='form-group', submit_btn_class='btn btn-primary')
+    })
 
-
-@bottle.route('/tag/:tagid/edit', method='POST')
-def index(tagid):
-    if bottle.request.POST.get('name') and bottle.request.POST.get('name').strip() != '':
-        em = EntityManager()
-
-        t = em.find_one_by_id('Tag', tagid)
-
-        t.name = bottle.request.POST.get('name')
-        
-        em.save('Tag', t)
-
-    return bottle.redirect('/tags')
+    return bottle.template('tag.tpl', vd=bottle.response.viewdata)
 
 
 @bottle.route('/tag/:tagid/delete')
@@ -276,16 +254,17 @@ def index(tagid):
 def index():
     em = EntityManager()
 
-    user = em.find_one('User', {'_id':bottle.session.user_id})
+    user = em.find_one('User', {'_id':bottle.request.session.user_id})
 
-    return bottle.template('api-key.tpl', vd=common_view_data({'key':user.api_key}))
+    bottle.response.viewdata.update({'key':user.api_key})
+    return bottle.template('api-key.tpl', vd=bottle.response.viewdata)
 
 
 @bottle.route('/api-key', method='POST')
 def index():
     a = AuthService(EntityManager())
 
-    a.generate_api_key(bottle.session.user_id)
+    a.generate_api_key(bottle.request.session.user_id)
 
     return bottle.redirect('/api-key')
 
@@ -322,7 +301,8 @@ def run_search(searchterm):
         return bottle.template('items.tpl', {'items':items})
 
     else:
-        return bottle.template('index.tpl', vd=common_view_data({'items':items}))
+        bottle.response.viewdata.update({'items':items})
+        return bottle.template('index.tpl', vd=bottle.response.viewdata)
 
     
 
@@ -333,6 +313,8 @@ def run_search(searchterm):
 
 app = bottle.app()
 app.install(auth_plugin)
+app.install(viewdata_plugin)
+
 app.mount('/auth/', auth_app)
 
 
