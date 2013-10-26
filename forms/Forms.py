@@ -12,7 +12,7 @@ def ItemForm(tags=None, entity=None):
     formitems = []
     formitems.append(FormItem(Types.HIDDEN_TYPE, '_id', id='_id'))
     formitems.append(FormItem(Types.TEXT_TYPE, 'title', id='title', label_text='Title', class_name="form-control", required=True))
-    formitems.append(FormItem(Types.TEXTAREA_TYPE, 'content', id='content', label_text='Content', class_name="form-control"))
+    formitems.append(FormItem(Types.TEXTAREA_TYPE, 'content', id='content', label_text='Content', class_name="form-control", html=True))
     formitems.append(FormItem(Types.MULTI_SELECT_TYPE, 'tagIds', id='tagIds', label_text='Tags', class_name="form-control", select_list_items=tags))
     formitems.append(FormItem(Types.TEXT_TYPE, 'newTag', id='newTag', label_text='New Tag', class_name="form-control"))
 
