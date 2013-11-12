@@ -327,4 +327,8 @@ if __name__ == '__main__':
     if settings.DEBUG: 
         bottle.debug() 
         
-    bottle.run(app=app,server=settings.SERVER, reloader=settings.DEBUG, host=settings.APPHOST, port=settings.APPPORT, quiet=(settings.DEBUG==False) )
+    if settings.SERVER == 'gunicorn':    
+        bottle.run(server=settings.SERVER, host=settings.APPHOST, port=settings.APPPORT, worker_class='gevent')
+    else:
+        bottle.run(app=app, server=settings.SERVER, reloader=settings.DEBUG, host=settings.APPHOST, port=settings.APPPORT, quiet=(settings.DEBUG==False) )
+    
