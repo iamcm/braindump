@@ -59,11 +59,19 @@ def save_item(item, newtagname):
     em = EntityManager()
 
     if newtagname:
-        t = Tag()
-        t.name = newtagname
-        t = em.save('Tag', t)
+        existingTag = EntityManager().find_one('Tag', {'name':newtagname})
+        if existingTag:
+            newTagId = existingTag._id
+        else:
+            t = Tag()
+            t.name = newtagname
+            t = em.save('Tag', t)
+            newTagId = t._id
 
-        item.tagIds.append(str(t._id))
+        if not item.tagIds:
+            item.tagIds = []
+
+        item.tagIds.append(str(newTagId))
     
     em.save('Item', item)
 
