@@ -59,7 +59,7 @@ def save_item(item, newtagname):
     em = EntityManager()
 
     if newtagname:
-        existingTag = EntityManager().find_one('Tag', {'name':newtagname})
+        existingTag = em.find_one('Tag', {'name':newtagname})
         if existingTag:
             newTagId = existingTag._id
         else:
@@ -226,10 +226,14 @@ def index():
         em = EntityManager()
 
         t = form.hydrate_entity(Tag())
-        
-        em.save('Tag', t)
 
-        return bottle.redirect('/tags')
+        if EntityManager().find_raw('Tag', objfilter={'name': t.name}, count=True) == 0:
+            em.save('Tag', t)
+
+            return bottle.redirect('/tags')
+
+        else:
+            form.errors.append('A Tag with that name already exists')
 
 
     bottle.response.viewdata.update({

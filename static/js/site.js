@@ -34,7 +34,7 @@ $(document).ready(function(){
 			classname = 'btn'
 		}
 		
-		var el = '<button class="tag m2 '+ classname +'" id="'+ $(this).val() +'">'+ $(this).text() +'</button>';
+		var el = '<button class="tag m2 '+ classname +'" id="'+ $(this).val() +'">'+ $(this).html() +'</button>';
 		
 		$('#tagIds').parent().append(el);
 	});
