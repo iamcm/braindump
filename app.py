@@ -6,7 +6,7 @@ import os
 import bottle
 import settings
 from Helpers import logger
-from EntityManager import EntityManager
+from mongorm.EntityManager import EntityManager
 from Auth.auth import AuthService, User, AuthPlugin
 from Auth.apps import auth_app
 from models.Models import *

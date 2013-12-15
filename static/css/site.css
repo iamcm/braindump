@@ -1,3 +1,7 @@
 html, body{
     padding-top: 35px;
 }
+
+.tag-nav > li > a {
+	padding:0px;
+}

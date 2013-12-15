@@ -20,6 +20,8 @@
             tabfocus_elements: ":prev,:next"
         });
 
+        $('#title').focus();
+
 </script>
 %end
 

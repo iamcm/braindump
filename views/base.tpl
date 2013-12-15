@@ -67,7 +67,7 @@
 
             <div class="col-xs-6 col-sm-3">
                 <div class="well">
-                    <ul class="nav">
+                    <ul class="tag-nav nav">
                         % for t in vd['tags']:
                         <li><a href="/tag/{{t.slug}}">{{t.name}}</a></li>
                         % end

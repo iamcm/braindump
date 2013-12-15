@@ -1,4 +1,4 @@
-from BaseModel import BaseModel
+from mongorm.BaseModel import BaseModel
 import datetime
 
 class Tag(BaseModel):    
