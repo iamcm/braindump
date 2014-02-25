@@ -204,10 +204,10 @@ def index(itemid):
     if item.files:
         for f in item.files:
             fullpath = os.path.join(settings.USERFILESPATH, f.sysname)
-            thumbpath = os.path.join(settings.USERFILESPATH, 'thumb_'+ f.sysname)
+            #thumbpath = os.path.join(settings.USERFILESPATH, 'thumb_'+ f.sysname)
 
             os.system('rm '+ fullpath)
-            os.system('rm '+ thumbpath)
+            #os.system('rm '+ thumbpath)
 
             em.remove_one('File', f._id)
 
@@ -365,12 +365,12 @@ def index():
 
         uploadedFile.save(savepath)
 
-        thumbpath = os.path.join(settings.USERFILESPATH, 'thumb_'+ newname)
+        """thumbpath = os.path.join(settings.USERFILESPATH, 'thumb_'+ newname)
 
         try:
             os.system('convert %s -resize 150 %s' % (savepath, thumbpath))
         except:
-            os.system('cp %s %s' % (savepath, thumbpath))
+            os.system('cp %s %s' % (savepath, thumbpath))"""
 
         f = File()
         f.nicename = uploadedFile.filename
