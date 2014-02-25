@@ -17,6 +17,15 @@ class Item(BaseModel):
         self.title = None
         self.content = None
         self.tagIds = []
+        self.files = []
         self.added = datetime.datetime.now()
 
+
+
+class File(BaseModel):    
+    def __init__(self):
+        self.session_id = None
+        self.nicename = None
+        self.sysname = None
+        self.added = datetime.datetime.now()
 

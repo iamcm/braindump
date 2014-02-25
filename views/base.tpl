@@ -8,6 +8,9 @@
     <link href="/static/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/generic.css" rel="stylesheet">
     <link href="/static/css/site.css" rel="stylesheet">
+    %if defined('css'):
+        %css()
+    %end
 
 </head>
 

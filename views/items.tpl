@@ -8,6 +8,16 @@
     <span style="display:none">
         <hr />
         <div class="content">{{!i.content}}</div>
+	    % if i.files:
+	        <div class="py10">
+			    % for f in i.files:
+			    	<div>
+			    		<a href="/userfiles/{{f.sysname}}">{{f.nicename}}</a>
+			    	</div>
+				% end
+			</div>
+		% end
     </span>
+	
 </div>
 % end

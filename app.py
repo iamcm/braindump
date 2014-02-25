@@ -27,6 +27,10 @@ if settings.PROVIDE_STATIC_FILES:
     def index(filepath):
         return bottle.static_file(filepath, root=settings.ROOTPATH +'/static/')
 
+@bottle.route('/userfiles/<filepath:path>')
+def index(filepath):
+    return bottle.static_file(filepath, root=settings.USERFILESPATH)
+
 
 
 
@@ -74,6 +78,10 @@ def save_item(item, newtagname):
         item.tagIds.append(str(newTagId))
     
     em.save('Item', item)
+
+
+def randomfilename():
+    return ''.join(random.sample(string.letters + string.digits, 25))
 
 
 #######################################################
@@ -140,7 +148,15 @@ def index():
 
     if form.is_valid():
         i = form.hydrate_entity(Item())
+        #associate any uploaded files:
+        em = EntityManager()
+        for f in em.find('File', {'session_id': str(bottle.request.session._id)}):
+            f.session_id = None
+            em.save('File', f)
+            i.files.append(f)
+
         save_item(i, form.get_value('newTag'))
+
         return bottle.redirect('/items')        
 
     for item in form.formitems:
@@ -182,6 +198,19 @@ def index(itemid):
 def index(itemid):
     em = EntityManager()
     
+    item = em.find_one_by_id('Item', itemid)
+
+    #delete any uploaded files for this item
+    if item.files:
+        for f in item.files:
+            fullpath = os.path.join(settings.USERFILESPATH, f.sysname)
+            thumbpath = os.path.join(settings.USERFILESPATH, 'thumb_'+ f.sysname)
+
+            os.system('rm '+ fullpath)
+            os.system('rm '+ thumbpath)
+
+            em.remove_one('File', f._id)
+
     em.remove_one('Item', itemid)
 
     return bottle.redirect('/items')
@@ -319,6 +348,35 @@ def run_search(searchterm):
         return bottle.template('index.tpl', vd=bottle.response.viewdata)
 
     
+
+
+
+@bottle.route('/upload', method='POST')
+def index():
+    uploadedFile = bottle.request.files.get('file')
+    if uploadedFile:
+        nicename, ext = os.path.splitext(uploadedFile.filename)
+
+        newname = randomfilename() + ext
+        savepath = os.path.join(settings.USERFILESPATH, newname)
+        while os.path.isfile(savepath):
+            newname = randomfilename() + ext
+            savepath = os.path.join(settings.USERFILESPATH, newname)
+
+        uploadedFile.save(savepath)
+
+        thumbpath = os.path.join(settings.USERFILESPATH, 'thumb_'+ newname)
+
+        try:
+            os.system('convert %s -resize 150 %s' % (savepath, thumbpath))
+        except:
+            os.system('cp %s %s' % (savepath, thumbpath))
+
+        f = File()
+        f.nicename = uploadedFile.filename
+        f.sysname = newname
+        f.session_id = str(bottle.request.session._id)
+        EntityManager().save('File', f)
 
 
 #######################################################
