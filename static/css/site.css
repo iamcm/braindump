@@ -5,3 +5,7 @@ html, body{
 .tag-nav > li > a {
 	padding:0px;
 }
+
+textarea {
+	min-height: 250px;
+}
