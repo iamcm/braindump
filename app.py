@@ -1,3 +1,4 @@
+import sys
 import random
 import string
 import json
@@ -7,16 +8,50 @@ import bottle
 import settings
 from Helpers import logger
 from mongorm.EntityManager import EntityManager
-from Auth.auth import AuthService, User, AuthPlugin
-from Auth.apps import auth_app
 from models.Models import *
 from Helpers.emailHelper import Email
-from BottlePlugins import ViewdataPlugin
 from forms.Forms import *
 from FormBinder import FormBinderPlugin
+from shared.decorators import authenticate, force_protocol
+from shared.auth import *
 
-auth_plugin = AuthPlugin(EntityManager())
 form_binder_plugin = FormBinderPlugin()
+
+CLIENT_ID = 'braindump_jdue18ju891fnjhue2n3c03'
+#################################
+#################################
+#################################
+CAN_REGISTER = False
+@bottle.route('/login', method=['get'])
+@force_protocol('https')
+def index(**kw):
+    content = login_get(bottle, CAN_REGISTER)
+    return bottle.template('public', content=content)
+
+@bottle.route('/login', method=['post'])
+@force_protocol('https')
+def index(**kw):
+    return login_post(bottle, CLIENT_ID)
+
+@bottle.route('/logout')
+def index(**kw):
+    return logout(bottle, CLIENT_ID)
+
+if CAN_REGISTER:
+    @bottle.route('/register', method=['get'])
+    def index(**kw):
+        header_text = "Register"
+        content = register_get(bottle)
+        return bottle.template('public', content=content)
+
+    @bottle.route('/register', method=['post'])
+    def index(**kw):
+        user_id = register_post(bottle, CLIENT_ID, success_url=None)
+        rpc('user_details', 'save', CLIENT_ID, user_id, {'email':bottle.request.POST.get('email')})
+        return bottle.redirect('/login')
+#################################
+#################################
+#################################
 
 
 #######################################################
@@ -42,9 +77,9 @@ def get_tags():
     return EntityManager().find('Tag', sort=[('slug', 1)])
 
 
-def common_view_data():
-    if bottle.request.session:
-        user = EntityManager().find_one_by_id('User', bottle.request.session.user_id)
+def common_view_data(session=None):
+    if session:
+        user = session['data']['user']
     else:
         user = None
 
@@ -55,7 +90,6 @@ def common_view_data():
 
     return vd
 
-viewdata_plugin = ViewdataPlugin(callback_function=common_view_data)
 
 
 
@@ -88,12 +122,14 @@ def randomfilename():
 # Main app routes
 #######################################################
 @bottle.route('/')
-def index(): 
-    return bottle.template('index.tpl', vd=bottle.response.viewdata)
+@authenticate(CLIENT_ID)
+def index(session): 
+    return bottle.template('index.tpl', vd=common_view_data(session))
 
 
 @bottle.route('/tag/:slug')
-def index(slug):
+@authenticate(CLIENT_ID)
+def index(slug, session):
     em = EntityManager()
 
     tag = em.find_one('Tag', {'slug': slug})
@@ -110,15 +146,17 @@ def index(slug):
             bottle.response.content_type = 'text/json'
             return json.dumps([em.entity_to_json_safe_dict(i) for i in items])
         else:
-            bottle.response.viewdata.update({'items':items})
-            return bottle.template('index.tpl', vd=bottle.response.viewdata)
+            vd = common_view_data(session)
+            vd.update({'items':items})
+            return bottle.template('index.tpl', vd=vd)
         
     else:
         return bottle.HTTPError(400)
 
 
 @bottle.route('/items')
-def index():
+@authenticate(CLIENT_ID)
+def index(session):
     em = EntityManager()
 
     items = em.find('Item', sort=[('added', -1)])
@@ -127,30 +165,34 @@ def index():
         bottle.response.content_type = 'text/json'
         return json.dumps([em.entity_to_json_safe_dict(i) for i in items])
     else:
-        bottle.response.viewdata.update({'items':items})
-        return bottle.template('index.tpl', vd=bottle.response.viewdata)
+        vd = common_view_data(session)
+        vd.update({'items':items})
+        return bottle.template('index.tpl', vd=vd)
 
 
 @bottle.route('/item', method='GET')
-def index():
+@authenticate(CLIENT_ID)
+def index(session):
     tags_select_items = [(str(t._id), t.name) for t in get_tags()]
-    bottle.response.viewdata.update({
+    vd = common_view_data(session)
+    vd.update({
         'form': ItemForm(tags_select_items).get_html(form_id='form-add-item', row_class='form-group', submit_btn_class='btn btn-primary')
     })
 
-    return bottle.template('item.tpl', vd=bottle.response.viewdata)
+    return bottle.template('item.tpl', vd=vd)
 
 
 
 @bottle.route('/item', method='POST', apply=[form_binder_plugin], form=ItemForm)
-def index():
+@authenticate(CLIENT_ID)
+def index(session):
     form = bottle.request.form
 
     if form.is_valid():
         i = form.hydrate_entity(Item())
         #associate any uploaded files:
         em = EntityManager()
-        for f in em.find('File', {'session_id': str(bottle.request.session._id)}):
+        for f in em.find('File', {'session_id': session['session_id']}):
             f.session_id = None
             em.save('File', f)
             i.files.append(f)
@@ -163,30 +205,34 @@ def index():
         if item.name == 'tagIds':
             item.select_list_items = [(str(t._id), t.name) for t in get_tags()]
 
-    bottle.response.viewdata.update({
+    vd = common_view_data(session)
+    vd.update({
         'form': form.get_html(row_class='form-group', submit_btn_class='btn btn-primary')
     })    
 
-    return bottle.template('item.tpl', vd=bottle.response.viewdata)
+    return bottle.template('item.tpl', vd=vd)
 
 
 @bottle.route('/item/:itemid/edit', method='GET')
-def index(itemid):
+@authenticate(CLIENT_ID)
+def index(session, itemid):
     em = EntityManager()
     
     item = em.find_one_by_id('Item', itemid)
 
     tags_select_items = [(str(t._id), t.name) for t in get_tags()]
 
-    bottle.response.viewdata.update({
+    vd = common_view_data(session)
+    vd.update({
         'form': ItemForm(tags_select_items, entity=item).get_html(form_id='form-add-item', action='/item', row_class='form-group', submit_btn_class='btn btn-primary')
     })
 
-    return bottle.template('item.tpl', vd=bottle.response.viewdata)
+    return bottle.template('item.tpl', vd=vd)
 
 
 @bottle.route('/item/:itemid/content', method='GET')
-def index(itemid):
+@authenticate(CLIENT_ID)
+def index(session, itemid):
     em = EntityManager()
     
     item = em.find_one_by_id('Item', itemid)
@@ -195,7 +241,8 @@ def index(itemid):
 
 
 @bottle.route('/item/:itemid/delete', method='GET')
-def index(itemid):
+@authenticate(CLIENT_ID)
+def index(session, itemid):
     em = EntityManager()
     
     item = em.find_one_by_id('Item', itemid)
@@ -217,7 +264,8 @@ def index(itemid):
 
 
 @bottle.route('/item/:itemid/delete', method='POST')
-def index(itemid):
+@authenticate(CLIENT_ID)
+def index(session, itemid):
     em = EntityManager()
     
     em.remove_one('Item', itemid)
@@ -230,25 +278,29 @@ def index(itemid):
 
 
 @bottle.route('/tags')
-def index():
+@authenticate(CLIENT_ID)
+def index(session):
     if bottle.request.GET.get('apikey'):
         bottle.response.content_type = 'text/json'
         return json.dumps([EntityManager().entity_to_json_safe_dict(t) for t in get_tags()])
     else:
-        return bottle.template('tags.tpl', vd=bottle.response.viewdata)
+        return bottle.template('tags.tpl', vd=common_view_data(session))
 
 
 @bottle.route('/tag', method='GET')
-def index():
-    bottle.response.viewdata.update({
+@authenticate(CLIENT_ID)
+def index(session):
+    vd = common_view_data(session)
+    vd.update({
         'form': TagForm().get_html(row_class='form-group', submit_btn_class='btn btn-primary')
     })
 
-    return bottle.template('tag.tpl', vd=bottle.response.viewdata)
+    return bottle.template('tag.tpl', vd=vd)
 
 
 @bottle.route('/tag', method='POST', apply=[form_binder_plugin], form=TagForm)
-def index():
+@authenticate(CLIENT_ID)
+def index(session):
     form = bottle.request.form
 
     if form.is_valid():
@@ -264,28 +316,31 @@ def index():
         else:
             form.errors.append('A Tag with that name already exists')
 
-
-    bottle.response.viewdata.update({
+    vd = common_view_data(session)
+    vd.update({
         'form': form.get_html(row_class='form-group', submit_btn_class='btn btn-primary')
     })
 
-    return bottle.template('tag.tpl', vd=bottle.response.viewdata)
+    return bottle.template('tag.tpl', vd=vd)
 
 
 @bottle.route('/tag/:tagid/edit', method='GET')
-def index(tagid):
+@authenticate(CLIENT_ID)
+def index(session, tagid):
     em = EntityManager()
     tag = em.find_one_by_id('Tag', tagid)
 
-    bottle.response.viewdata.update({
+    vd = common_view_data(session)
+    vd.update({
         'form': TagForm(entity=tag).get_html(action='/tag', row_class='form-group', submit_btn_class='btn btn-primary')
     })
 
-    return bottle.template('tag.tpl', vd=bottle.response.viewdata)
+    return bottle.template('tag.tpl', vd=vd)
 
 
 @bottle.route('/tag/:tagid/delete')
-def index(tagid):
+@authenticate(CLIENT_ID)
+def index(session, tagid):
     em = EntityManager()
     
     em.remove_one('Tag', tagid)
@@ -294,36 +349,38 @@ def index(tagid):
 
 
 @bottle.route('/api-key', method='GET')
-def index():
-    em = EntityManager()
-
-    user = em.find_one('User', {'_id':bottle.request.session.user_id})
-
-    bottle.response.viewdata.update({'key':user.api_key})
-    return bottle.template('api-key.tpl', vd=bottle.response.viewdata)
+@authenticate(CLIENT_ID)
+def index(session):
+    vd = common_view_data(session)
+    vd.update({'key':session['data']['user']['api_key']})
+    return bottle.template('api-key.tpl', vd=vd)
 
 
 @bottle.route('/api-key', method='POST')
-def index():
-    a = AuthService(EntityManager())
+@authenticate(CLIENT_ID)
+def index(session):
+    user = rpc('auth','regenerate_api_key', {'clientId':CLIENT_ID, 'email':session['data']['user']['email']})
+    session['data']['user'] = user
 
-    a.generate_api_key(bottle.request.session.user_id)
+    rpc('session', 'save', CLIENT_ID, session['session_id'], session['data'])
 
     return bottle.redirect('/api-key')
 
 
 @bottle.route('/search/:searchterm')
-def api_search(searchterm):
+@authenticate(CLIENT_ID)
+def index(session, searchterm):
     return run_search(searchterm)
 
 
 @bottle.route('/search/items')
-def search():
+@authenticate(CLIENT_ID)
+def index(session):
     searchterm = bottle.request.GET.get('name')
     return run_search(searchterm)
 
 
-def run_search(searchterm):
+def run_search(session, searchterm):
     em = EntityManager()
 
     raw_items = em.fuzzy_text_search('Item', searchterm, 'title')
@@ -344,15 +401,17 @@ def run_search(searchterm):
         return bottle.template('items.tpl', {'items':items})
 
     else:
-        bottle.response.viewdata.update({'items':items})
-        return bottle.template('index.tpl', vd=bottle.response.viewdata)
+        vd = common_view_data(session)
+        vd.update({'items':items})
+        return bottle.template('index.tpl', vd=vd)
 
     
 
 
 
 @bottle.route('/upload', method='POST')
-def index():
+@authenticate(CLIENT_ID)
+def index(session):
     uploadedFile = bottle.request.files.get('file')
     if uploadedFile:
         nicename, ext = os.path.splitext(uploadedFile.filename)
@@ -375,20 +434,13 @@ def index():
         f = File()
         f.nicename = uploadedFile.filename
         f.sysname = newname
-        f.session_id = str(bottle.request.session._id)
+        f.session_id = session['session_id']
         EntityManager().save('File', f)
 
 
 #######################################################
 
-
-
 app = bottle.app()
-app.install(auth_plugin)
-app.install(viewdata_plugin)
-
-app.mount('/auth/', auth_app)
-
 
 if __name__ == '__main__':
     with open(settings.ROOTPATH +'/app.pid','w') as f:

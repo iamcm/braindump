@@ -34,7 +34,7 @@
 
                 %if vd['logged_in_user']:
                 <ul class="nav navbar-nav pull-right">
-                    <li><a href="/auth/logout">Logout</a></li>
+                    <li><a href="/logout">Logout</a></li>
                 </ul>
                 %end
             </div>

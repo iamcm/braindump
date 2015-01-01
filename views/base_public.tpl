@@ -25,15 +25,6 @@
     </head>
   
     <body>
-
-        <div class="navbar navbar-fixed-top">
-            <div class="navbar-inner">
-                <div class="container-fluid">
-                    <ul class="nav">
-                    </ul>
-                </div>
-            </div>
-        </div>
     
         <div class="container">
             %include
