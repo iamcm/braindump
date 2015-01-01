@@ -370,14 +370,14 @@ def index(session):
 @bottle.route('/search/:searchterm')
 @authenticate(CLIENT_ID)
 def index(session, searchterm):
-    return run_search(searchterm)
+    return run_search(session, searchterm)
 
 
 @bottle.route('/search/items')
 @authenticate(CLIENT_ID)
 def index(session):
     searchterm = bottle.request.GET.get('name')
-    return run_search(searchterm)
+    return run_search(session, searchterm)
 
 
 def run_search(session, searchterm):
