@@ -96,11 +96,12 @@ def common_view_data(session=None):
 def save_item(item, newtagname):
     em = EntityManager()
 
-    #recall existing files for this item
-    existingItem = em.find_one_by_id('Item', item._id)
-    if existingItem:
-        for f in existingItem.files:
-            item.files.append(f)
+    if item._id:
+        #recall existing files for this item
+        existingItem = em.find_one_by_id('Item', item._id)
+        if existingItem is not None:
+            for f in existingItem.files:
+                item.files.append(f)
 
 
 
